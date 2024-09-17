@@ -21,7 +21,7 @@ SET @@SESSION.SQL_LOG_BIN= 0;
 -- GTID state at the beginning of the backup 
 --
 
-SET @@GLOBAL.GTID_PURGED=/*!80000 '+'*/ 'e481c9c3-71ba-11eb-8e7a-42010a4fe004:1-10861987232';
+SET @@GLOBAL.GTID_PURGED=/*!80000 '+'*/ 'e481c9c3-71ba-11eb-8e7a-42010a4fe004:1-10862009380';
 
 --
 -- Table structure for table `affiliates`
@@ -1162,4 +1162,4 @@ SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-09-17 17:22:44
+-- Dump completed on 2024-09-17 17:29:46
