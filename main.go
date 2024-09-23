@@ -44,7 +44,7 @@ func (server *Server) LoginUser(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Please provide the correct input!!"))
 		return
 	}
-	query := `SELECT * FROM User where msisdn = ?`
+	query := `SELECT profile_id, msisdn, hash, network FROM profile where msisdn = ?`
 	rows, err := server.DB.Query(query, userReqBody.Msisdn)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -57,6 +57,7 @@ func (server *Server) LoginUser(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte("Something bad happened on the server :("))
+			fmt.Println(err)
 			return
 		}
 	}
@@ -71,11 +72,12 @@ func (server *Server) LoginUser(w http.ResponseWriter, r *http.Request) {
 	 * for that we mask few of the user details in the jwt token
 	 * these are called as claims and are used for verifying user w.r.t token
 	 */
-	claims := map[string]interface{}{"id": user.Id, "msisdn": user.Msisdn}
+	claims := map[string]interface{}{"profile_id": user.Id, "msisdn": user.Msisdn}
 	_, tokenString, err := server.AuthToken.Encode(claims)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Something bad happened on the server :("))
+		fmt.Println(err)
 		return
 	}
 
@@ -116,8 +118,8 @@ func (server *Server) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := `INSERT INTO User (msisdn, hash) VALUES (?, ?)`
-	result, err := server.DB.Exec(query, userReqBody.Msisdn, hashPassword)
+	query := `INSERT INTO profile (msisdn, hash, network) VALUES (?, ?, ?)`
+	result, err := server.DB.Exec(query, userReqBody.Msisdn, hashPassword, userReqBody.Network)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Something bad happened on the server :("))
@@ -132,13 +134,13 @@ func (server *Server) CreateUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-/* This GET /user/{id} will require the JWT token
+/* This GET /user/{profile_id} will require the JWT token
  * generated from POST /user/login in auth headers
  */
 func (server *Server) GetUser(w http.ResponseWriter, r *http.Request) {
 
-	// We get the 'id' from URL parameters of the request
-	id := chi.URLParam(r, "id")
+	// We get the 'profile_id' from URL parameters of the request
+	id := chi.URLParam(r, "profile_id")
 	userId, err := strconv.Atoi(id)
 
 	if err != nil {
@@ -154,7 +156,7 @@ func (server *Server) GetUser(w http.ResponseWriter, r *http.Request) {
 	 * different JWT token and hence unauthorized.
 	 */
 	_, claims, _ := jwtauth.FromContext(r.Context())
-	userIdFromClaims := int(claims["id"].(float64))
+	userIdFromClaims := int(claims["profile_id"].(float64))
 
 	if userId != userIdFromClaims {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -162,7 +164,7 @@ func (server *Server) GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := `SELECT * FROM User WHERE id = ?`
+	query := `SELECT profile_id, msisdn, hash, network FROM profile WHERE profile_id = ?`
 
 	rows, err := server.DB.Query(query, userId)
 	if err != nil {
@@ -177,6 +179,7 @@ func (server *Server) GetUser(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte("Something bad happened on the server :("))
+			fmt.Println(err)
 			return
 		}
 	}
@@ -274,7 +277,7 @@ func (server *Server) MountHandlers() {
 
 			/*  GET /user/{id}    =   get user with specific ID
 			 */
-			r.Get("/{id}", server.GetUser)
+			r.Get("/{profile_id}", server.GetUser)
 		})
 	})
 }
