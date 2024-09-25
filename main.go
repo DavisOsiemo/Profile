@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 
+	"bytes"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/jwtauth/v5"
@@ -37,20 +39,33 @@ func checkPassword(hashPassword, password string) bool {
  * generate claims and create token and return it in response
  */
 
+type ErrorMessage struct {
+	Status  int
+	Message string
+}
+
 func (server *Server) LoginUser(w http.ResponseWriter, r *http.Request) {
 	userReqBody := new(models.UserRequestBody)
 	if err := json.NewDecoder(r.Body).Decode(userReqBody); err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode("Please Provide Correct Input")
+		errorMessage := ErrorMessage{
+			Status:  http.StatusBadRequest,
+			Message: "Please Provide Correct Input",
+		}
+
+		var buffer bytes.Buffer
+		json.NewEncoder(&buffer).Encode(&errorMessage)
 		return
 	}
 	query := `SELECT profile_id, msisdn, hash, network FROM profile where msisdn = ?`
 	rows, err := server.DB.Query(query, userReqBody.Msisdn)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode("Please Provide Correct User and Password")
+		errorMessage := ErrorMessage{
+			Status:  http.StatusBadRequest,
+			Message: "Please Provide Correct User and Password",
+		}
+		json.NewEncoder(w).Encode(&errorMessage)
 
 		return
 	}
@@ -59,8 +74,11 @@ func (server *Server) LoginUser(w http.ResponseWriter, r *http.Request) {
 		user, err = models.ScanRow(rows)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode("Failed to find User. Server Error")
+			errorMessage := ErrorMessage{
+				Status:  http.StatusBadRequest,
+				Message: "Failed to find User. Server Error",
+			}
+			json.NewEncoder(w).Encode(&errorMessage)
 			return
 		}
 	}
@@ -68,8 +86,11 @@ func (server *Server) LoginUser(w http.ResponseWriter, r *http.Request) {
 	if !checkPassword(user.Hash, userReqBody.Password) {
 
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode("Incorrect password please check again")
+		errorMessage := ErrorMessage{
+			Status:  http.StatusBadRequest,
+			Message: "Please Provide Correct Input",
+		}
+		json.NewEncoder(w).Encode(&errorMessage)
 
 		return
 	}
@@ -83,16 +104,72 @@ func (server *Server) LoginUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode("Could not Generate Token")
+		errorMessage := ErrorMessage{
+			Status:  http.StatusInternalServerError,
+			Message: "Could not Generate Token",
+		}
+		json.NewEncoder(w).Encode(&errorMessage)
 
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(tokenString)
+	loginResponse := LoginResponse{
+		UserA: UserA{
+			Id:      user.Id,
+			Mobile:  user.Msisdn,
+			Profile: user.Id,
+			Balance: 1,
+			Bonus:   1,
+			Points:  1,
+			Token:   tokenString,
+			Expires: 1,
+			UserAA: UserAA{
+				Id:      user.Id,
+				Mobile:  user.Msisdn,
+				Balance: 1,
+				Bonus:   1,
+				Points:  1,
+			},
+		},
+		Expires: 1,
+	}
 
+	json.NewEncoder(w).Encode(loginResponse)
+}
+
+type LoginResponse struct {
+	UserA struct {
+		Id      int
+		Mobile  string
+		Profile int
+		Balance int
+		Bonus   int
+		Points  int
+		Token   string
+		Expires int
+		UserAA  UserAA
+	}
+	Expires int
+}
+type UserA struct {
+	Id      int
+	Mobile  string
+	Profile int
+	Balance int
+	Bonus   int
+	Points  int
+	Token   string
+	Expires int
+	UserAA  UserAA
+}
+
+type UserAA struct {
+	Id      int
+	Mobile  string
+	Balance int
+	Bonus   int
+	Points  int
 }
 
 /*
@@ -116,40 +193,60 @@ func getHashPassword(password string) (string, error) {
 func (server *Server) CreateUser(w http.ResponseWriter, r *http.Request) {
 	userReqBody := new(models.UserRequestBody)
 	if err := json.NewDecoder(r.Body).Decode(userReqBody); err != nil {
+
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode("Please Provide Correct Input")
+		errorMessage := ErrorMessage{
+			Status:  http.StatusBadRequest,
+			Message: "Please Provide Correct Input",
+		}
+		json.NewEncoder(w).Encode(&errorMessage)
 		return
 	}
 
 	hashPassword, err := getHashPassword(userReqBody.Password)
 	if err != nil {
+
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode("Incorrect Password Format")
+		errorMessage := ErrorMessage{
+			Status:  http.StatusInternalServerError,
+			Message: "Incorrect Password Format",
+		}
+		json.NewEncoder(w).Encode(&errorMessage)
+
 		return
 	}
 
 	query := `INSERT INTO profile (msisdn, hash, network) VALUES (?, ?, ?)`
 	result, err := server.DB.Exec(query, userReqBody.Msisdn, hashPassword, userReqBody.Network)
 	if err != nil {
+
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode("User Exists or Wrong input Format")
+		errorMessage := ErrorMessage{
+			Status:  http.StatusInternalServerError,
+			Message: "User Already Exists or Wrong input Format",
+		}
+		json.NewEncoder(w).Encode(&errorMessage)
 		return
 	}
 	recordId, _ := result.LastInsertId()
-	response := models.Response{
-		Id: int(recordId),
-	}
-
-	//w.WriteHeader(http.StatusOK)
-	//json.NewEncoder(w).Encode(response)
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	userCreatedResponse := UserCreatedResponse{
+		ProfileId: int(recordId),
+		Status:    http.StatusOK,
+		Mobile:    userReqBody.Msisdn,
+		Message:   "User Created",
+	}
 
+	json.NewEncoder(w).Encode(&userCreatedResponse)
+
+}
+
+type UserCreatedResponse struct {
+	ProfileId int
+	Status    int
+	Mobile    string
+	Message   string
 }
 
 /* This GET /user/{profile_id} will require the JWT token
@@ -164,8 +261,12 @@ func (server *Server) GetUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode("Could not find User. Provide Correct Input")
+		errorMessage := ErrorMessage{
+			Status:  http.StatusBadRequest,
+			Message: "Could not find User. Provide Correct Input",
+		}
+		json.NewEncoder(w).Encode(&errorMessage)
+
 		return
 	}
 
@@ -179,10 +280,13 @@ func (server *Server) GetUser(w http.ResponseWriter, r *http.Request) {
 	userIdFromClaims := int(claims["profile_id"].(float64))
 
 	if userId != userIdFromClaims {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode("You are Unauthorized to Access this page. Please Log In")
 
+		w.Header().Set("Content-Type", "application/json")
+		errorMessage := ErrorMessage{
+			Status:  http.StatusUnauthorized,
+			Message: "You are Unauthorized to Access this page. Please Log In",
+		}
+		json.NewEncoder(w).Encode(&errorMessage)
 		return
 	}
 
@@ -190,10 +294,12 @@ func (server *Server) GetUser(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := server.DB.Query(query, userId)
 	if err != nil {
-
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode("Could not find User with given Profile Id")
+		errorMessage := ErrorMessage{
+			Status:  http.StatusBadRequest,
+			Message: "Could not find User with given Profile Id",
+		}
+		json.NewEncoder(w).Encode(&errorMessage)
 
 		return
 	}
@@ -203,8 +309,11 @@ func (server *Server) GetUser(w http.ResponseWriter, r *http.Request) {
 		user, err = models.ScanRow(rows)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode("Could not find User with given User Details")
+			errorMessage := ErrorMessage{
+				Status:  http.StatusInternalServerError,
+				Message: "Could not find User with given User Details",
+			}
+			json.NewEncoder(w).Encode(&errorMessage)
 
 			return
 		}
