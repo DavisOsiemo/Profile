@@ -115,7 +115,7 @@ func (server *Server) LoginUser(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	loginResponse := LoginResponse{
-		UserA: UserA{
+		User: User{
 			Id:      user.Id,
 			Mobile:  user.Msisdn,
 			Profile: user.Id,
@@ -124,13 +124,6 @@ func (server *Server) LoginUser(w http.ResponseWriter, r *http.Request) {
 			Points:  1,
 			Token:   tokenString,
 			Expires: 1,
-			UserAA: UserAA{
-				Id:      user.Id,
-				Mobile:  user.Msisdn,
-				Balance: 1,
-				Bonus:   1,
-				Points:  1,
-			},
 		},
 		Expires: 1,
 	}
@@ -139,7 +132,7 @@ func (server *Server) LoginUser(w http.ResponseWriter, r *http.Request) {
 }
 
 type LoginResponse struct {
-	UserA struct {
+	User struct {
 		Id      int
 		Mobile  string
 		Profile int
@@ -148,11 +141,10 @@ type LoginResponse struct {
 		Points  int
 		Token   string
 		Expires int
-		UserAA  UserAA
 	}
 	Expires int
 }
-type UserA struct {
+type User struct {
 	Id      int
 	Mobile  string
 	Profile int
@@ -161,15 +153,6 @@ type UserA struct {
 	Points  int
 	Token   string
 	Expires int
-	UserAA  UserAA
-}
-
-type UserAA struct {
-	Id      int
-	Mobile  string
-	Balance int
-	Bonus   int
-	Points  int
 }
 
 /*
