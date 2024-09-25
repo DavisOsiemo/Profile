@@ -40,31 +40,37 @@ func checkPassword(hashPassword, password string) bool {
 func (server *Server) LoginUser(w http.ResponseWriter, r *http.Request) {
 	userReqBody := new(models.UserRequestBody)
 	if err := json.NewDecoder(r.Body).Decode(userReqBody); err != nil {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Please provide the correct input!!"))
+		json.NewEncoder(w).Encode("Please Provide Correct Input")
 		return
 	}
 	query := `SELECT profile_id, msisdn, hash, network FROM profile where msisdn = ?`
 	rows, err := server.DB.Query(query, userReqBody.Msisdn)
 	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Please provide the correct input!!"))
+		json.NewEncoder(w).Encode("Please Provide Correct User and Password")
+
 		return
 	}
 	var user *models.User
 	for rows.Next() {
 		user, err = models.ScanRow(rows)
 		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("Something bad happened on the server :("))
-			fmt.Println(err)
+			json.NewEncoder(w).Encode("Failed to find User. Server Error")
 			return
 		}
 	}
 
 	if !checkPassword(user.Hash, userReqBody.Password) {
+
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Incorrect password please check again"))
+		json.NewEncoder(w).Encode("Incorrect password please check again")
+
 		return
 	}
 
@@ -75,14 +81,18 @@ func (server *Server) LoginUser(w http.ResponseWriter, r *http.Request) {
 	claims := map[string]interface{}{"profile_id": user.Id, "msisdn": user.Msisdn}
 	_, tokenString, err := server.AuthToken.Encode(claims)
 	if err != nil {
+
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Something bad happened on the server :("))
-		fmt.Println(err)
+		json.NewEncoder(w).Encode("Could not Generate Token")
+
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(tokenString))
+	json.NewEncoder(w).Encode(tokenString)
+
 }
 
 /*
@@ -106,23 +116,26 @@ func getHashPassword(password string) (string, error) {
 func (server *Server) CreateUser(w http.ResponseWriter, r *http.Request) {
 	userReqBody := new(models.UserRequestBody)
 	if err := json.NewDecoder(r.Body).Decode(userReqBody); err != nil {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Please provide the correct input!!"))
+		json.NewEncoder(w).Encode("Please Provide Correct Input")
 		return
 	}
 
 	hashPassword, err := getHashPassword(userReqBody.Password)
 	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Something bad happened on the server :("))
+		json.NewEncoder(w).Encode("Incorrect Password Format")
 		return
 	}
 
 	query := `INSERT INTO profile (msisdn, hash, network) VALUES (?, ?, ?)`
 	result, err := server.DB.Exec(query, userReqBody.Msisdn, hashPassword, userReqBody.Network)
 	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Something bad happened on the server :("))
+		json.NewEncoder(w).Encode("User Exists or Wrong input Format")
 		return
 	}
 	recordId, _ := result.LastInsertId()
@@ -130,8 +143,13 @@ func (server *Server) CreateUser(w http.ResponseWriter, r *http.Request) {
 		Id: int(recordId),
 	}
 
+	//w.WriteHeader(http.StatusOK)
+	//json.NewEncoder(w).Encode(response)
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
+
 }
 
 /* This GET /user/{profile_id} will require the JWT token
@@ -144,8 +162,10 @@ func (server *Server) GetUser(w http.ResponseWriter, r *http.Request) {
 	userId, err := strconv.Atoi(id)
 
 	if err != nil {
+
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Please provide the correct input!!"))
+		json.NewEncoder(w).Encode("Could not find User. Provide Correct Input")
 		return
 	}
 
@@ -159,8 +179,10 @@ func (server *Server) GetUser(w http.ResponseWriter, r *http.Request) {
 	userIdFromClaims := int(claims["profile_id"].(float64))
 
 	if userId != userIdFromClaims {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte("You're not authorized >("))
+		json.NewEncoder(w).Encode("You are Unauthorized to Access this page. Please Log In")
+
 		return
 	}
 
@@ -168,8 +190,11 @@ func (server *Server) GetUser(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := server.DB.Query(query, userId)
 	if err != nil {
+
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Please provide the correct input!!"))
+		json.NewEncoder(w).Encode("Could not find User with given Profile Id")
+
 		return
 	}
 
@@ -177,12 +202,14 @@ func (server *Server) GetUser(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		user, err = models.ScanRow(rows)
 		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("Something bad happened on the server :("))
-			fmt.Println(err)
+			json.NewEncoder(w).Encode("Could not find User with given User Details")
+
 			return
 		}
 	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(user)
 }
