@@ -191,7 +191,7 @@ func (server *Server) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("Content-Type", "application/json")
 		errorMessage := ErrorMessage{
-			Status:  http.StatusInternalServerError,
+			Status:  http.StatusBadRequest,
 			Message: "Incorrect Password Format",
 		}
 		json.NewEncoder(w).Encode(&errorMessage)
@@ -205,7 +205,7 @@ func (server *Server) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("Content-Type", "application/json")
 		errorMessage := ErrorMessage{
-			Status:  http.StatusInternalServerError,
+			Status:  http.StatusBadRequest,
 			Message: "User Already Exists or Wrong input Format",
 		}
 		json.NewEncoder(w).Encode(&errorMessage)
@@ -293,7 +293,7 @@ func (server *Server) GetUser(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			errorMessage := ErrorMessage{
-				Status:  http.StatusInternalServerError,
+				Status:  http.StatusNotFound,
 				Message: "Could not find User with given User Details",
 			}
 			json.NewEncoder(w).Encode(&errorMessage)
